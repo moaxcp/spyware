@@ -18,7 +18,13 @@ dependencies {
 }
 
 application {
-    mainClass = 'com.github.moaxcp.spyware.WebServer'
+    mainClass = 'com.github.moaxcp.spyware.Main'
+}
+
+jar {
+    manifest {
+        attributes 'Main-Class': 'com.github.moaxcp.spyware.Main' // Replace with your actual main class
+    }
 }
 
 test {
@@ -26,15 +32,16 @@ test {
 }
 
 windowsService {
-    architecture = 'amd64'
+    architecture = 'AMD64'
     displayName = 'Screenshot Service'
     description = 'Service to take screenshots'
-    startClass = 'Main'
+    startClass = 'com.github.moaxcp.spyware.Main'
     startMethod = 'main'
-    startParams = 'start'
-    stopClass = 'Main'
-    stopMethod = 'main'
-    stopParams = 'stop'
     startup = 'auto'
     interactive = true
+    pidFile = 'pid.txt'
+    logPath = '%APP_HOME%\\logs'
+    logPrefix = 'spyware'
+    stdOutput = 'auto'
+    stdError = 'auto'
 }

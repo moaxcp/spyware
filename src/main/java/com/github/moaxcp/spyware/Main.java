@@ -1,8 +1,5 @@
 package com.github.moaxcp.spyware;
 
-import com.sun.net.httpserver.HttpServer;
-
-import java.io.IOException;
 import java.util.Objects;
 
 public class Main {
@@ -20,18 +17,18 @@ public class Main {
     }
   }
 
-  public static void main(String[] args) throws IOException {
+  public static void main(String[] args) {
     if (server == null) {
       server = new WebServer();
     }
-    String command = "start";
-    if (args.length > 0) {
-      command = args[0];
-    }
-    if ("start".equals(command)) {
-      new Thread(() -> server.start(resolvePort())).start();
-    } else {
-      server.stop();
-    }
+
+    int port = resolvePort();
+    server.start(port);
+    int actualPort = server.getPort();
+
+    javax.swing.SwingUtilities.invokeLater(() -> {
+      SpywareGui gui = new SpywareGui(server);
+      gui.setPort(actualPort);
+    });
   }
 }

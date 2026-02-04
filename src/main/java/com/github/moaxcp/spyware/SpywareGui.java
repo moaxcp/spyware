@@ -15,6 +15,7 @@ public class SpywareGui extends JFrame {
 
     public SpywareGui(WebServer server) {
         this.server = server;
+        Thread.currentThread().setName("Spyware GUI");
         setTitle("Spyware Web Server Control");
         setSize(400, 200);
         setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
@@ -40,7 +41,7 @@ public class SpywareGui extends JFrame {
 
     private void updateStatus() {
         if (server.isRunning()) {
-            statusLabel.setText("Status: Running on port " + port);
+            statusLabel.setText("Status: Running " + server.getIP() + ":" + port);
             updateButtons(true);
         } else {
             statusLabel.setText("Status: Stopped");

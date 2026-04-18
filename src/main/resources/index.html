@@ -21,20 +21,30 @@
         user-select: none;
         -webkit-user-drag: none;
       }
+      #selection-rect {
+        position: absolute;
+        border: 2px dashed #f00;
+        background: rgba(255, 0, 0, 0.2);
+        display: none;
+        pointer-events: none;
+        z-index: 100;
+      }
     </style>
   </head>
   <body>
-    <div style="padding: 8px; color: #ddd; font-family: sans-serif;">
+    <div style="padding: 8px; color: #ddd; font-family: sans-serif; position: relative; z-index: 101; background: rgba(17, 17, 17, 0.8);">
       Spyware web service is running. Try GET <a href="/screenshot">/screenshot</a> to get a JPEG screenshot.
-      (Wheel to zoom, drag to pan.)
+      (Wheel to zoom, drag to pan, <b>Shift + Click/Drag</b> to select area.)
       <br/>
       Screenshot Refresh Speed: <span id="refresh-interval">5</span> seconds
       <button id="increase-speed">-1s (Faster)</button>
       <button id="decrease-speed">+1s (Slower)</button>
+      <button id="reset-selection">Reset Selection</button>
     </div>
 
     <div id="stage">
       <img src="/screenshot" id="screenshot" alt="screenshot"/>
+      <div id="selection-rect"></div>
     </div>
 
     <script>
@@ -43,15 +53,24 @@
       const intervalDisplay = document.getElementById('refresh-interval');
       const increaseBtn = document.getElementById('increase-speed');
       const decreaseBtn = document.getElementById('decrease-speed');
+      const resetBtn = document.getElementById('reset-selection');
+      const selectionRect = document.getElementById('selection-rect');
 
       let refreshIntervalSeconds = 5;
       let refreshTimer;
+      let selectedArea = null; // {x, y, width, height}
 
       function startRefresh() {
         if (refreshTimer) clearInterval(refreshTimer);
         refreshTimer = setInterval(function() {
-          const params = new URLSearchParams(window.location.search);
+          const params = new URLSearchParams();
           params.set('rand', Math.random());
+          if (selectedArea) {
+            params.set('x', Math.round(selectedArea.x));
+            params.set('y', Math.round(selectedArea.y));
+            params.set('width', Math.round(selectedArea.width));
+            params.set('height', Math.round(selectedArea.height));
+          }
           img.src = '/screenshot?' + params.toString();
         }, refreshIntervalSeconds * 1000);
       }
@@ -70,6 +89,17 @@
         startRefresh();
       });
 
+      resetBtn.addEventListener('click', () => {
+        selectedArea = null;
+        selectionRect.style.display = 'none';
+        // When resetting, we also reset zoom/pan to make sure we see the full screen
+        scale = 1;
+        tx = 0;
+        ty = 0;
+        applyTransform();
+        startRefresh();
+      });
+
       startRefresh();
 
       let scale = 1;
@@ -79,6 +109,60 @@
         img.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
       }
       applyTransform();
+
+      // Selection logic
+      let selecting = false;
+      let startX, startY;
+
+      function getMousePosOnImage(e) {
+        const rect = stage.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Image coordinates: (mouseX - tx) / scale
+        // But we need screen coordinates of the area to be captured.
+        // Wait, the ScreenshotService captures the actual screen.
+        // The image being displayed IS a capture of the screen.
+        // If the user selects a region on the image, we need to map it back to screen coordinates.
+        // The /screenshot returns the full virtual screen by default.
+        // So image pixel (0,0) is screen (0,0)? Actually it depends on getVirtualScreenBounds.
+        // Assuming ScreenshotService.getVirtualScreenBounds() is what we see.
+
+        const imgX = (mouseX - tx) / scale;
+        const imgY = (mouseY - ty) / scale;
+
+        // We need the natural size of the image to map back to screen coordinates
+        const naturalWidth = img.naturalWidth;
+        const naturalHeight = img.naturalHeight;
+        const displayedWidth = img.width; // this might be affected by CSS width: 100%
+        // img.width is the current width of the element.
+        // CSS width: 100% means it fills the width of the parent (stage).
+
+        // Ratio of natural size to displayed size (at scale 1)
+        const ratioX = naturalWidth / img.clientWidth;
+        const ratioY = naturalHeight / img.clientHeight;
+
+        return {
+          x: imgX * ratioX,
+          y: imgY * ratioY
+        };
+      }
+
+      function updateSelectionRect(e) {
+        const rect = stage.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const left = Math.min(startX, mouseX);
+        const top = Math.min(startY, mouseY);
+        const width = Math.abs(startX - mouseX);
+        const height = Math.abs(startY - mouseY);
+
+        selectionRect.style.left = left + 'px';
+        selectionRect.style.top = top + 'px';
+        selectionRect.style.width = width + 'px';
+        selectionRect.style.height = height + 'px';
+      }
 
       // Zoom with wheel, keeping the point under the cursor stable.
       stage.addEventListener('wheel', (e) => {
@@ -90,7 +174,7 @@
 
         const oldScale = scale;
         const zoomFactor = Math.exp(-e.deltaY * 0.0015); // smooth zoom
-        scale = Math.min(8, Math.max(1, scale * zoomFactor));
+        scale = Math.min(8, Math.max(0.1, scale * zoomFactor));
 
         // Adjust translation so (cx,cy) stays anchored
         tx = cx - (cx - tx) * (scale / oldScale);
@@ -104,6 +188,15 @@
       let lastX = 0, lastY = 0;
 
       stage.addEventListener('mousedown', (e) => {
+        if (e.shiftKey) {
+          selecting = true;
+          const rect = stage.getBoundingClientRect();
+          startX = e.clientX - rect.left;
+          startY = e.clientY - rect.top;
+          selectionRect.style.display = 'block';
+          updateSelectionRect(e);
+          return;
+        }
         dragging = true;
         stage.classList.add('dragging');
         lastX = e.clientX;
@@ -111,6 +204,10 @@
       });
 
       window.addEventListener('mousemove', (e) => {
+        if (selecting) {
+          updateSelectionRect(e);
+          return;
+        }
         if (!dragging) return;
         tx += (e.clientX - lastX);
         ty += (e.clientY - lastY);
@@ -119,7 +216,50 @@
         applyTransform();
       });
 
-      window.addEventListener('mouseup', () => {
+      window.addEventListener('mouseup', (e) => {
+        if (selecting) {
+          selecting = false;
+          const rect = stage.getBoundingClientRect();
+          
+          const p1 = getMousePosOnImage({clientX: startX + rect.left, clientY: startY + rect.top});
+          const p2 = getMousePosOnImage(e);
+
+          const left = Math.min(p1.x, p2.x);
+          const top = Math.min(p1.y, p2.y);
+          const width = Math.abs(p1.x - p2.x);
+          const height = Math.abs(p1.y - p2.y);
+
+          // Map relative coordinates to absolute screen coordinates
+          // If we currently have a selectedArea, the image being displayed is ONLY that area.
+          // So (0,0) on the current image is (selectedArea.x, selectedArea.y) on the screen.
+          
+          const baseTargetX = selectedArea ? selectedArea.x : 0;
+          const baseTargetY = selectedArea ? selectedArea.y : 0;
+
+          const newArea = {
+            x: baseTargetX + left,
+            y: baseTargetY + top,
+            width: width,
+            height: height
+          };
+
+          // If it's just a click (no area), reset selection
+          if (newArea.width < 5 || newArea.height < 5) {
+            selectedArea = null;
+            selectionRect.style.display = 'none';
+          } else {
+            selectedArea = newArea;
+            selectionRect.style.display = 'none';
+            // Also reset zoom/pan to see the new selection properly at full size
+            scale = 1;
+            tx = 0;
+            ty = 0;
+            applyTransform();
+          }
+
+          startRefresh();
+          return;
+        }
         dragging = false;
         stage.classList.remove('dragging');
       });

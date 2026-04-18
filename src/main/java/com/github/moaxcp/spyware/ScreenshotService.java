@@ -7,31 +7,43 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 /**
- * Service for capturing screenshots as PNG bytes.
+ * Service for capturing screenshots as JPEG bytes.
  */
 public class ScreenshotService {
 
     /**
-     * Captures a screenshot of all available screens and returns the image bytes in PNG format.
+     * Captures a screenshot of all available screens and returns the image bytes in JPEG format.
      *
-     * @return PNG-encoded bytes of the captured screenshot
+     * @return JPEG-encoded bytes of the captured screenshot
      * @throws IllegalStateException if the environment is headless and cannot capture a screen
      * @throws AWTException          if the screenshot capture fails due to AWT/Robot issues
-     * @throws IOException           if encoding the image to PNG fails
+     * @throws IOException           if encoding the image to JPEG fails
      */
-    public byte[] capturePng() throws AWTException, IOException {
+    public byte[] captureJpeg() throws AWTException, IOException {
+        return captureJpeg(getVirtualScreenBounds());
+    }
+
+    /**
+     * Captures a screenshot of the specified bounds and returns the image bytes in JPEG format.
+     *
+     * @param bounds the area to capture
+     * @return JPEG-encoded bytes of the captured screenshot
+     * @throws IllegalStateException if the environment is headless and cannot capture a screen
+     * @throws AWTException          if the screenshot capture fails due to AWT/Robot issues
+     * @throws IOException           if encoding the image to JPEG fails
+     */
+    public byte[] captureJpeg(Rectangle bounds) throws AWTException, IOException {
         if (GraphicsEnvironment.isHeadless()) {
             throw new IllegalStateException("Cannot capture screenshot in headless environment");
         }
 
-        Rectangle bounds = getVirtualScreenBounds();
         Robot robot = new Robot();
         BufferedImage image = robot.createScreenCapture(bounds);
 
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            boolean ok = ImageIO.write(image, "png", baos);
+            boolean ok = ImageIO.write(image, "jpeg", baos);
             if (!ok) {
-                throw new IOException("No PNG writer available");
+                throw new IOException("No JPEG writer available");
             }
             return baos.toByteArray();
         }

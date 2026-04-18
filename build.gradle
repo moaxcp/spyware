@@ -1,7 +1,6 @@
 plugins {
     id 'java'
     id 'application'
-    id 'com.github.alexeylisyutenko.windows-service-plugin' version '1.1.0'
 }
 
 group = 'com.github.moaxcp.spyware'
@@ -29,19 +28,4 @@ jar {
 
 test {
     useJUnitPlatform()
-}
-
-windowsService {
-    architecture = 'AMD64'
-    displayName = 'Screenshot Service'
-    description = 'Service to take screenshots'
-    startClass = 'com.github.moaxcp.spyware.Main'
-    startMethod = 'main'
-    startup = 'auto'
-    interactive = true
-    pidFile = 'pid.txt'
-    logPath = '%APP_HOME%\\logs'
-    logPrefix = 'spyware'
-    stdOutput = 'auto'
-    stdError = 'auto'
 }
